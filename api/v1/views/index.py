@@ -9,7 +9,7 @@ from models import storage
 def service_status():
     """created route returns status of RESTful service
     TODO check if this formatting is okay for json response"""
-    return jsonify({'status': 'OK'})
+    return jsonify({'status': "OK"})
 
 
 @app_views.route('/stats', methods=['GET'], strict_slashes=False)
