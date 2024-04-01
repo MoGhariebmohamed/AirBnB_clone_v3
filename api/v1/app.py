@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """api file main flask """
 
-from flask import flask
+from flask import Flask
 from flask import jsonify
 from flask_cors import CORS
 from models import storage
@@ -13,7 +13,7 @@ app = Flask(__name__)
 app.register_blueprint(app_views)
 CORS(app, resources={r'/*': {'origins': '0.0.0.0'}})
 
-@app.teardown_appcontent
+@app.teardown_appcontext
 def teardown_appcontext(exc=None):
     """called on teardown of app context of flask
     """
