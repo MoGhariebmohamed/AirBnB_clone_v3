@@ -13,11 +13,13 @@ app = Flask(__name__)
 app.register_blueprint(app_views)
 CORS(app, resources={r'/*': {'origins': '0.0.0.0'}})
 
+
 @app.teardown_appcontext
 def teardown_appcontext(exc=None):
     """called on teardown of app context of flask
     """
     storage.close()
+
 
 if __name__ == "__main__":
     """required to run flask"""
