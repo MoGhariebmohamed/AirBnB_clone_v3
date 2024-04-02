@@ -20,23 +20,22 @@ def teardown_appcontext(exc=None):
     """
     storage.close()
 
-def errorhandler_404(e):
+
+@app.errorhandler(404)
+def errorhandler_404(error):
     """response to 404 json"""
-    error_404 = {
-            'error': "Not found"
-    }
-    return (jsonifty(error_404), 404)
+    error_404 = {"error": "Not found"}
+    return jsonify(error_404), 404
 
 
 if __name__ == "__main__":
     """required to run flask"""
 
     app.config['JSONIFY_PRETTYPRINT_REGULAR'] = True
-    app.register_error_handler(404, errorhandler_404)
     fetched_host = os.environ.get('HBNB_API_HOST')
     fetched_port = os.environ.get('HBNB_API_PORT')
     if fetched_host is None:
         fetched_host = '0.0.0.0'
     if fetched_port is None:
         fetched_port = 5000
-    app.run(host=fetched_host, port=fetched_port, threaded=True)
+    app.run(debug=True, host=fetched_host, port=fetched_port, threaded=True)
