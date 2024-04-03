@@ -1,131 +1,74 @@
 #!/usr/bin/python3
-"""This module implement a rule that return a view"""
-from flask import jsonify, abort, request
-from models import storage
-from api.v1.views import app_views
-from models.city import City
+"""New view for the link between Place objects and Amenity objects"""
 from models.place import Place
-from models.user import User
-from models.state import State
 from models.amenity import Amenity
+from api.v1.views import app_views
+from models import storage
+from os import getenv
+from flask import jsonify, abort
 from flasgger.utils import swag_from
 
+mode = getenv("HBNB_TYPE_STORAGE")
 
-@app_views.route("/cities/<city_id>/places", methods=["GET"],
+
+@app_views.route("/places/<place_id>/amenities", methods=["GET"],
                  strict_slashes=False)
-@swag_from('documentation/place/get_places.yml', methods=['GET'])
-def place_by_city(city_id):
-    """View function that return place objects by city"""
-    city = storage.get(City, city_id)
-    if city is None:
-        abort(404)
-    return jsonify([place.to_dict() for place in city.places])
-
-
-@app_views.route("/places/<place_id>", methods=["GET"],
-                 strict_slashes=False)
-@swag_from('documentation/place/get_place.yml', methods=['GET'])
-def show_place(place_id):
-    """Endpoint that return a Place object"""
+@swag_from('documentation/place_amenity/get_places_amenities.yml',
+           methods=['GET'])
+def amenities_from_place(place_id):
+    """Get all amenities of a place object"""
     place = storage.get(Place, place_id)
     if place is None:
         abort(404)
-    return jsonify(place.to_dict())
+    if mode == "db":
+        return jsonify([amenity.to_dict() for amenity in place.amenities])
+    else:
+        return jsonify([
+            storage.get(Amenity, _id).to_dict() for _id in place.amenity_ids
+        ])
 
 
-@app_views.route("/places/<place_id>", methods=["DELETE"],
-                 strict_slashes=False)
-@swag_from('documentation/place/delete_place.yml', methods=['DELETE'])
-def delete_place(place_id):
-    """Endpoint that delete a Place object"""
+@app_views.route("/places/<place_id>/amenities/<amenity_id>",
+                 methods=["DELETE"], strict_slashes=False)
+@swag_from('documentation/place_amenity/delete_place_amenities.yml',
+           methods=['DELETE'])
+def delete_amenity_from_place(place_id, amenity_id):
+    """Delete a Amenity object by its id from a Place object"""
     place = storage.get(Place, place_id)
-    if place is None:
+    amenity = storage.get(Amenity, amenity_id)
+    if place is None or amenity is None:
         abort(404)
-    place.delete()
+    if mode == "db":
+        if amenity not in place.amenities:
+            abort(404)
+    else:
+        if amenity.id not in place.amenity_id:
+            abort(404)
+    amenity.delete()
     storage.save()
+
     return jsonify({})
 
 
-@app_views.route("/cities/<city_id>/places", methods=["POST"],
+@app_views.route("places/<place_id>/amenities/<amenity_id>", methods=["POST"],
                  strict_slashes=False)
-@swag_from('documentation/place/post_place.yml', methods=['POST'])
-def insert_place(city_id):
-    """Endpoint that insert a Place object"""
-    city = storage.get(City, city_id)
-    if city is None:
-        abort(404)
-    res = request.get_json()
-    if type(res) != dict:
-        abort(400, description="Not a JSON")
-    if not res.get("user_id"):
-        abort(400, description="Missing user_id")
-    user = storage.get(User, res.get("user_id"))
-    if user is None:
-        abort(404)
-    if not res.get("name"):
-        abort(400, description="Missing name")
-    new_place = Place(**res)
-    new_place.city_id = city_id
-    new_place.save()
-    return jsonify(new_place.to_dict()), 201
-
-
-@app_views.route("/places_search", methods=["POST"],
-                 strict_slashes=False)
-@swag_from('documentation/place/put_place.yml', methods=['PUT'])
-def places_search():
-    """Retrieves all Place objects depending of the body of the request"""
-    body = request.get_json()
-    if type(body) != dict:
-        abort(400, description="Not a JSON")
-    id_states = body.get("states", [])
-    id_cities = body.get("cities", [])
-    id_amenities = body.get("amenities", [])
-    places = []
-    if id_states == id_cities == []:
-        places = storage.all(Place).values()
-    else:
-        states = [
-            storage.get(State, _id) for _id in id_states
-            if storage.get(State, _id)
-        ]
-        cities = [city for state in states for city in state.cities]
-        cities += [
-            storage.get(City, _id) for _id in id_cities
-            if storage.get(City, _id)
-        ]
-        cities = list(set(cities))
-        places = [place for city in cities for place in city.places]
-
-    amenities = [
-        storage.get(Amenity, _id) for _id in id_amenities
-        if storage.get(Amenity, _id)
-    ]
-
-    res = []
-    for place in places:
-        res.append(place.to_dict())
-        for amenity in amenities:
-            if amenity not in place.amenities:
-                res.pop()
-                break
-
-    return jsonify(res)
-
-
-@app_views.route("/places/<place_id>", methods=["PUT"],
-                 strict_slashes=False)
-@swag_from('documentation/place/post_search.yml', methods=['POST'])
-def update_place(place_id):
-    """Endpoint that update a Place object"""
+@swag_from('documentation/place_amenity/post_place_amenities.yml',
+           methods=['POST'])
+def insert_amenity_in_place(place_id, amenity_id):
+    """Insert new amenity object into Place object"""
     place = storage.get(Place, place_id)
-    if place is None:
+    amenity = storage.get(Amenity, amenity_id)
+    if place is None or amenity is None:
         abort(404)
-    res = request.get_json()
-    if type(res) != dict:
-        abort(400, description="Not a JSON")
-    for key, value in res.items():
-        if key not in ["id", "user_id", "city_id", "created_at", "updated_at"]:
-            setattr(place, key, value)
+    if mode == "db":
+        if amenity in place.amenities:
+            return jsonify(amenity.to_dict())
+        else:
+            place.amenities.append(amenity)
+    else:
+        if amenity.id in place.amenity_id:
+            return jsonify(amenity.to_dict())
+        else:
+            place.amenity_id.append(amenity.id)
     storage.save()
-    return jsonify(place.to_dict()), 200
+    return jsonify(amenity.to_dict()), 201
